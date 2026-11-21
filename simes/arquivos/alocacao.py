@@ -185,13 +185,34 @@ class AlocadorEncadeado(Alocador):
     nome = "encadeada"
 
     def alocar(self, fcb, n):
-        raise NotImplementedError("TODO (M6): alocação encadeada")
+        blocos = self.bitmap.primeiros_livres(n)
+        if blocos is None:
+            self.falhas += 1
+            raise ErroSA("ENOSPC", "sem %d blocos livres" % n)
+        self.bitmap.ocupar(blocos)
+        fcb.blocos = blocos
+        fcb.extra["cursor"] = -1
+        return []
 
     def estender(self, fcb, n):
-        raise NotImplementedError("TODO (M6): alocação encadeada")
+        if n <= 0:
+            return []
+        novos = self.bitmap.primeiros_livres(n)
+        if novos is None:
+            self.falhas += 1
+            raise ErroSA("ENOSPC", "sem %d blocos livres" % n)
+        ultimo_antigo = fcb.blocos[-1] if fcb.blocos else None
+        self.bitmap.ocupar(novos)
+        fcb.blocos.extend(novos)
+        fcb.extra.setdefault("cursor", -1)
+        return [("E", ultimo_antigo)] if ultimo_antigo is not None else []
 
     def bloco_fisico(self, fcb, i):
-        raise NotImplementedError("TODO (M6): alocação encadeada")
+        cursor = fcb.extra.get("cursor", -1)
+        inicio = cursor + 1 if i > cursor else 0
+        extras = [("L", fcb.blocos[j]) for j in range(inicio, i)]
+        fcb.extra["cursor"] = i
+        return fcb.blocos[i], extras
 
 
 class AlocadorFAT(Alocador):
@@ -203,13 +224,27 @@ class AlocadorFAT(Alocador):
     nome = "fat"
 
     def alocar(self, fcb, n):
-        raise NotImplementedError("TODO (M6): FAT")
+        blocos = self.bitmap.primeiros_livres(n)
+        if blocos is None:
+            self.falhas += 1
+            raise ErroSA("ENOSPC", "sem %d blocos livres" % n)
+        self.bitmap.ocupar(blocos)
+        fcb.blocos = blocos
+        return []
 
     def estender(self, fcb, n):
-        raise NotImplementedError("TODO (M6): FAT")
+        if n <= 0:
+            return []
+        novos = self.bitmap.primeiros_livres(n)
+        if novos is None:
+            self.falhas += 1
+            raise ErroSA("ENOSPC", "sem %d blocos livres" % n)
+        self.bitmap.ocupar(novos)
+        fcb.blocos.extend(novos)
+        return []
 
     def bloco_fisico(self, fcb, i):
-        raise NotImplementedError("TODO (M6): FAT")
+        return fcb.blocos[i], []
 
 
 class AlocadorIndexado(Alocador):
@@ -229,17 +264,49 @@ class AlocadorIndexado(Alocador):
     """
     nome = "indexada"
 
+    @staticmethod
+    def _quantidade_indices(n):
+        return 1 if n <= 1024 else 1 + (n + 1023) // 1024
+
     def alocar(self, fcb, n):
-        raise NotImplementedError("TODO (M6): alocação indexada")
+        indices_n = self._quantidade_indices(n)
+        blocos = self.bitmap.primeiros_livres(indices_n + n)
+        if blocos is None:
+            self.falhas += 1
+            raise ErroSA("ENOSPC", "sem espaço para índices e %d blocos de dados" % n)
+        self.bitmap.ocupar(blocos)
+        fcb.extra["indices"] = blocos[:indices_n]
+        fcb.blocos = blocos[indices_n:]
+        return [("E", b) for b in fcb.extra["indices"]]
 
     def estender(self, fcb, n):
-        raise NotImplementedError("TODO (M6): alocação indexada")
+        if n <= 0:
+            return []
+        total = len(fcb.blocos) + n
+        indices_n = self._quantidade_indices(total)
+        indices = fcb.extra.setdefault("indices", [])
+        adicionar_indices = indices_n - len(indices)
+        novos = self.bitmap.primeiros_livres(adicionar_indices + n)
+        if novos is None:
+            self.falhas += 1
+            raise ErroSA("ENOSPC", "sem espaço para índices e %d blocos de dados" % n)
+        self.bitmap.ocupar(novos)
+        indices.extend(novos[:adicionar_indices])
+        fcb.blocos.extend(novos[adicionar_indices:])
+        return [("E", b) for b in indices]
 
     def liberar(self, fcb):
-        raise NotImplementedError("TODO (M6): alocação indexada")
+        self.bitmap.liberar(fcb.blocos + fcb.extra.get("indices", []))
+        fcb.blocos = []
+        fcb.extra["indices"] = []
 
     def bloco_fisico(self, fcb, i):
-        raise NotImplementedError("TODO (M6): alocação indexada")
+        indices = fcb.extra["indices"]
+        if len(indices) == 1:
+            extras = [("L", indices[0])]
+        else:
+            extras = [("L", indices[0]), ("L", indices[1 + i // 1024])]
+        return fcb.blocos[i], extras
 
 
 ALOCADORES = {c.nome: c for c in (AlocadorContiguo, AlocadorEncadeado, AlocadorFAT, AlocadorIndexado)}

@@ -42,15 +42,17 @@ def extra(linha, chave):
     return 0.0
 
 
-def barras(plt, nome, titulo, grupos, series, valores, rotulo_y, log=False):
+def barras(plt, nome, titulo, grupos, series, valores, rotulo_y, log=False,
+           figsize=(8, 4.2), label_size=10):
     """valores[(grupo, serie)] -> número. Gráfico de barras agrupadas."""
-    fig, ax = plt.subplots(figsize=(8, 4.2))
+    fig, ax = plt.subplots(figsize=figsize)
     largura = 0.8 / max(1, len(series))
     for k, s in enumerate(series):
         xs = [i + k * largura for i in range(len(grupos))]
         ax.bar(xs, [valores.get((g, s), 0.0) for g in grupos], largura, label=str(s))
     ax.set_xticks([i + largura * (len(series) - 1) / 2.0 for i in range(len(grupos))])
     ax.set_xticklabels([str(g) for g in grupos])
+    ax.tick_params(axis="x", labelsize=label_size)
     ax.set_title(titulo)
     ax.set_ylabel(rotulo_y + (" — escala log" if log else ""))
     if log:
@@ -120,18 +122,32 @@ def main():
 
     x4 = [r for r in po if r["experimento"] == "X4" and r["operacao"] == "open"]
     if x4:
-        linhas(plt, "X4_open_por_profundidade.png", "X4 — custo do open conforme a profundidade",
-               {"acessos por open": [(int(r["carga"].split("_")[1]), num(r["acessos_medios"])) for r in x4],
-                "tempo por open (ms)": [(int(r["carga"].split("_")[1]), num(r["tempo_medio_ms"])) for r in x4]},
-               "profundidade (diretórios)", "valor")
+        profundidades = [int(r["carga"].split("_")[1]) for r in x4]
+        fig, (ax_acessos, ax_tempo) = plt.subplots(1, 2, figsize=(10, 4.2))
+        ax_acessos.plot(profundidades, [num(r["acessos_medios"]) for r in x4], marker="o")
+        ax_acessos.set_title("Acessos")
+        ax_acessos.set_xlabel("profundidade (diretórios)")
+        ax_acessos.set_ylabel("acessos por open (blocos)")
+        ax_acessos.grid(alpha=0.3)
+        ax_tempo.plot(profundidades, [num(r["tempo_medio_ms"]) for r in x4], marker="o")
+        ax_tempo.set_title("Tempo")
+        ax_tempo.set_xlabel("profundidade (diretórios)")
+        ax_tempo.set_ylabel("tempo por open (ms)")
+        ax_tempo.grid(alpha=0.3)
+        fig.suptitle("X4 — custo do open conforme a profundidade")
+        fig.tight_layout()
+        fig.savefig(os.path.join(SAIDA, "X4_open_por_profundidade.png"), dpi=130)
+        plt.close(fig)
         feitos.append("X4")
 
     x5 = [r for r in fs if r["experimento"] == "X5"]
     if x5:
         r = x5[0]
         cols = ["max_tabela_global", "max_tabela_processo", "max_soma_tabelas_processo", "max_contador_aberturas"]
-        barras(plt, "X5_tabelas.png", "X5 — tabelas de arquivos abertos", cols, ["servidor_web"],
-               {(c, "servidor_web"): num(r[c]) for c in cols}, "entradas")
+        rotulos = ["tabela\nglobal", "tabela por\nprocesso", "soma por\nprocesso", "máx. contador\nde aberturas"]
+        barras(plt, "X5_tabelas.png", "X5 — tabelas de arquivos abertos", rotulos, ["servidor_web"],
+               {(rotulo, "servidor_web"): num(r[col]) for col, rotulo in zip(cols, rotulos)},
+               "entradas", figsize=(9, 4.2), label_size=9)
         feitos.append("X5")
 
     x6 = [r for r in es if r["experimento"] == "X6" and r["cache"] != "nenhuma"]
@@ -174,9 +190,20 @@ def main():
 
     x11 = [r for r in fs if r["experimento"] == "X11"]
     if x11:
+        fig, (ax_acessos, ax_tempo) = plt.subplots(1, 2, figsize=(10, 4.2))
         alocs = [r["alocador"] for r in x11]
-        barras(plt, "X11_alocacao.png", "X11 — alocadores", ["acessos_por_op", "tempo_medio_op_ms"], alocs,
-               {(c, r["alocador"]): num(r[c]) for r in x11 for c in ("acessos_por_op", "tempo_medio_op_ms")}, "valor")
+        ax_acessos.bar(alocs, [num(r["acessos_por_op"]) for r in x11])
+        ax_acessos.set_title("Acessos")
+        ax_acessos.set_ylabel("acessos por operação (blocos)")
+        ax_acessos.grid(axis="y", alpha=0.3)
+        ax_tempo.bar(alocs, [num(r["tempo_medio_op_ms"]) for r in x11])
+        ax_tempo.set_title("Tempo")
+        ax_tempo.set_ylabel("tempo médio por operação (ms)")
+        ax_tempo.grid(axis="y", alpha=0.3)
+        fig.suptitle("X11 — alocadores")
+        fig.tight_layout()
+        fig.savefig(os.path.join(SAIDA, "X11_alocacao.png"), dpi=130)
+        plt.close(fig)
         barras(plt, "X11_fragmentacao.png", "X11 — espaço livre e falhas", ["segmentos_livres", "falhas_alocacao", "realocacoes"],
                alocs, {(c, r["alocador"]): extra(r, c) for r in x11 for c in ("segmentos_livres", "falhas_alocacao", "realocacoes")},
                "quantidade")
@@ -184,10 +211,17 @@ def main():
 
     x12 = [r for r in es if r["experimento"] == "X12"]
     if x12:
-        grupos = list(OrderedDict.fromkeys("%s/%s" % (r["carga"], r["cache"]) for r in x12))
+        def rotulo_x12(r):
+            carga, alocador = r["carga"].split("+")
+            carga_curta = "comp." if carga == "compilador" else "banco"
+            alocador_curto = "cont." if alocador == "contigua" else "index."
+            cache_curta = "sem cache" if r["cache"] == "nenhuma" else "LRU"
+            return "%s/%s\n%s" % (carga_curta, alocador_curto, cache_curta)
+
+        grupos = list(OrderedDict.fromkeys(rotulo_x12(r) for r in x12))
         barras(plt, "X12_resposta.png", "X12 — integração: tempo de resposta médio", grupos,
-               ["FCFS", "SSTF", "SCAN"], {("%s/%s" % (r["carga"], r["cache"]), r["escalonador"]): num(r["resposta_media_ms"]) for r in x12},
-               "ms", log=True)
+               ["FCFS", "SSTF", "SCAN"], {(rotulo_x12(r), r["escalonador"]): num(r["resposta_media_ms"]) for r in x12},
+               "ms", log=True, figsize=(12, 4.8), label_size=8)
         feitos.append("X12")
 
     print("Gráficos gerados em %s para: %s" % (SAIDA, ", ".join(feitos) or "nenhum experimento"))

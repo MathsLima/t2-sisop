@@ -1,10 +1,13 @@
 {
   "integrantes": [
-    {"nome": "Nome Completo do Integrante 1"}
+    {"nome": "Alice Koepp"},
+    {"nome": "Matheus Lima"},
+    {"nome": "Filipe Pereira"},
+    {"nome": "Júlia Tietbohl"}
   ],
-  "repositorio": "https://github.com/usuario/nome-do-repositorio",
-  "modulos": [],
-  "integracao": false,
+  "repositorio": "https://github.com/filipepereira03/T2-SISOP-2026II",
+  "modulos": ["M1", "M2", "M6"],
+  "integracao": true,
   "bonus_flash": false,
   "observacoes": ""
 }

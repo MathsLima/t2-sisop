@@ -54,7 +54,10 @@ class SSTF(Escalonador):
     nome = "SSTF"
 
     def escolher(self, fila, cabeca, direcao, agora, max_cilindro):
-        raise NotImplementedError("TODO (núcleo N2): implementar o SSTF")
+        indice = min(range(len(fila)), key=lambda i: abs(fila[i].cilindro - cabeca))
+        cilindro = fila[indice].cilindro
+        nova_direcao = direcao if cilindro == cabeca else (1 if cilindro > cabeca else -1)
+        return indice, nova_direcao, []
 
 
 class SCAN(Escalonador):
@@ -67,7 +70,16 @@ class SCAN(Escalonador):
     nome = "SCAN"
 
     def escolher(self, fila, cabeca, direcao, agora, max_cilindro):
-        raise NotImplementedError("TODO (núcleo N2): implementar o SCAN")
+        if direcao not in (-1, 1):
+            raise ValueError("direção deve ser -1 ou +1")
+        a_frente = [i for i, r in enumerate(fila)
+                    if (r.cilindro - cabeca) * direcao >= 0]
+        if a_frente:
+            indice = min(a_frente, key=lambda i: abs(fila[i].cilindro - cabeca))
+            return indice, direcao, []
+        borda = max_cilindro if direcao > 0 else 0
+        indice = min(range(len(fila)), key=lambda i: abs(fila[i].cilindro - borda))
+        return indice, -direcao, [] if cabeca == borda else [borda]
 
 
 # ------------------------------------------------------------------ módulo M2
@@ -79,7 +91,13 @@ class CSCAN(Escalonador):
     nome = "C-SCAN"
 
     def escolher(self, fila, cabeca, direcao, agora, max_cilindro):
-        raise NotImplementedError("TODO (M2): implementar o C-SCAN")
+        a_frente = [i for i, r in enumerate(fila) if r.cilindro >= cabeca]
+        if a_frente:
+            return min(a_frente, key=lambda i: fila[i].cilindro - cabeca), 1, []
+        indice = min(range(len(fila)), key=lambda i: fila[i].cilindro)
+        passar = [max_cilindro] if cabeca < max_cilindro else []
+        passar.append(0)
+        return indice, 1, passar
 
 
 class LOOK(Escalonador):
@@ -87,7 +105,15 @@ class LOOK(Escalonador):
     nome = "LOOK"
 
     def escolher(self, fila, cabeca, direcao, agora, max_cilindro):
-        raise NotImplementedError("TODO (M2): implementar o LOOK")
+        if direcao not in (-1, 1):
+            raise ValueError("direção deve ser -1 ou +1")
+        a_frente = [i for i, r in enumerate(fila)
+                    if (r.cilindro - cabeca) * direcao >= 0]
+        if a_frente:
+            indice = min(a_frente, key=lambda i: abs(fila[i].cilindro - cabeca))
+            return indice, direcao, []
+        indice = min(range(len(fila)), key=lambda i: abs(fila[i].cilindro - cabeca))
+        return indice, -direcao, []
 
 
 class CLOOK(Escalonador):
@@ -98,7 +124,11 @@ class CLOOK(Escalonador):
     nome = "C-LOOK"
 
     def escolher(self, fila, cabeca, direcao, agora, max_cilindro):
-        raise NotImplementedError("TODO (M2): implementar o C-LOOK")
+        a_frente = [i for i, r in enumerate(fila) if r.cilindro >= cabeca]
+        if a_frente:
+            return min(a_frente, key=lambda i: fila[i].cilindro - cabeca), 1, []
+        indice = min(range(len(fila)), key=lambda i: fila[i].cilindro)
+        return indice, 1, []
 
 
 class Deadline(Escalonador):
@@ -113,7 +143,11 @@ class Deadline(Escalonador):
     nome = "DEADLINE"
 
     def escolher(self, fila, cabeca, direcao, agora, max_cilindro):
-        raise NotImplementedError("TODO (M2): implementar o DEADLINE")
+        vencidos = [i for i, r in enumerate(fila) if agora >= r.prazo]
+        if vencidos:
+            indice = min(vencidos, key=lambda i: fila[i].prazo)
+            return indice, direcao, []
+        return SSTF().escolher(fila, cabeca, direcao, agora, max_cilindro)
 
 
 ESCALONADORES = {c.nome: c for c in (FCFS, SSTF, SCAN, CSCAN, LOOK, CLOOK, Deadline)}

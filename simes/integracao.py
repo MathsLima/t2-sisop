@@ -16,4 +16,8 @@ def historico_para_requisicoes(historico):
     """Converte o histórico da CamadaBloco numa lista de Requisicao (simes.es.requisicao),
     em ordem de chegada, com ids 0, 1, 2, ... Acessos da mesma operação chegam no mesmo
     instante."""
-    raise NotImplementedError("TODO (integração): converter o histórico em requisições")
+    from simes.es.requisicao import Requisicao
+
+    ordenado = sorted(enumerate(historico), key=lambda item: (item[1][0], item[0]))
+    return [Requisicao(i, registro[0], registro[1], registro[2], registro[3], registro[4])
+            for i, (_, registro) in enumerate(ordenado)]
