@@ -9,7 +9,11 @@
 Implementamos o núcleo de E/S e de sistema de arquivos, os módulos M1, M2 e M6 e a integração, onde registramos as hipóteses antes da execução oficial final e repetimos os testes e experimentos depois de reaplicar o código. Os resultados apresentados são os CSVs dessa rodada, mas não implementamos o bônus flash.
 
 
-### 1. Como executamos e registramos os testes
+## 1. Escopo realizado
+
+Grupo de 4 integrantes. Implementamos o núcleo (N1 a N4, com os experimentos X1 a X5), os módulos M1 (cache de blocos, X6), M2 (escalonamento avançado, X7) e M6 (alocação em disco, X11) e a integração ponta a ponta (X12). Não implementamos os módulos M3, M4 e M5 nem o bônus flash.
+
+### Como executamos e registramos os testes
 
 Usamos o ambiente Linux e Python 3.14, mantivemos o código do simulador compatível com Python 3.8 ou superior e não alteramos simes/parametros.py, experimentos.py nem as cargas. Para gerar os gráficos, instalamos matplotlib com python3 -m pip install --user matplotlib, onde essas dependências ficaram no ambiente e não foram adicionadas ao projeto.
 
@@ -98,7 +102,7 @@ Registramos as hipóteses antes da execução oficial inicial e as mantivemos na
 
 **Evidências:** Consultamos `resultados/experimentos.csv` e `resultados/es.csv` com `experimento=X1`, além de `graficos/X1_resposta_media_ms.png`.
 
-**Análise:** Observamos que SSTF reduziu o deslocamento e a resposta média frente a FCFS nas quatro cargas. Na concentrada, porém, medimos espera máxima de 130,519 ms para SSTF, acima de FCFS (96,023 ms) e SCAN (118,752 ms), o que ilustra o risco de postergar cilindros distantes. Em rajadas, SCAN teve menor deslocamento e espera máxima que SSTF, com resposta média quase igual. A resposta média alta de FCFS na carga chamada sequencial mostra que a ordem temporal de chegada não garante a ordem física dos blocos.
+**Análise:** Observamos que SSTF reduziu o deslocamento e a resposta média frente a FCFS nas quatro cargas. Na concentrada, porém, medimos espera máxima de 130,519 ms para SSTF, acima de FCFS (96,023 ms) e SCAN (118,752 ms), o que ilustra o risco de postergar cilindros distantes. Em rajadas, SCAN teve menor deslocamento e espera máxima que SSTF, com resposta média quase igual. A resposta média alta de FCFS na carga chamada sequencial mostra que a ordem temporal de chegada não garante a ordem física dos blocos. Em sistemas reais, o Linux não usa SSTF puro justamente por causa dessa inanição: o `mq-deadline` combina ordenação por posição com prazos de leitura e de escrita, e o `none` é o usual em SSDs, onde a posição do bloco não altera o custo.
 
 **Veredito:** PARCIALMENTE CONFIRMADA
 
@@ -121,7 +125,7 @@ Registramos as hipóteses antes da execução oficial inicial e as mantivemos na
 
 **Evidências:** Consultamos `resultados/experimentos.csv` e `resultados/es.csv` com `experimento=X2`, além de `graficos/X2_cpu.png`.
 
-**Análise:** Medimos 86,28–100,00% de CPU para polling no HDD, contra 0,84–1,12% para interrupções. No dispositivo rápido, observamos o inverso: o custo fixo por bloco da interrupção superou o breve atendimento em polling, chegando a 2,28% contra 1,07%. Interpretamos isso como consequência das fórmulas do modelo, não como medição de CPU real.
+**Análise:** Medimos 86,28–100,00% de CPU para polling no HDD, contra 0,84–1,12% para interrupções. No dispositivo rápido, observamos o inverso: o custo fixo por bloco da interrupção superou o breve atendimento em polling, chegando a 2,28% contra 1,07%. Interpretamos isso como consequência das fórmulas do modelo, não como medição de CPU real. Nos sistemas reais a regra é parecida: o Linux, o Windows e o macOS atendem discos por interrupção, e a espera ocupada só aparece onde a latência é muito curta, como nas filas de E/S com polling de dispositivos NVMe no Linux.
 
 **Veredito:** CONFIRMADA
 
@@ -144,7 +148,7 @@ Registramos as hipóteses antes da execução oficial inicial e as mantivemos na
 
 **Evidências:** Consultamos `resultados/experimentos.csv`, `resultados/arquivos.csv` e `resultados/arquivos_por_operacao.csv` com `experimento=X3`, além de `graficos/X3_tempo_por_operacao.png`.
 
-**Análise:** Observamos uma média de um bloco por operação nas duas cargas, mas as leituras do banco de dados levaram 3,70 vezes o tempo por operação do compilador e as escritas, 6,11 vezes. Como a contagem de acessos por bloco não registra busca e rotação, interpretamos essa diferença como coerente com a localidade sequencial da carga de compilação e os acessos diretos do banco.
+**Análise:** Observamos uma média de um bloco por operação nas duas cargas, mas as leituras do banco de dados levaram 3,70 vezes o tempo por operação do compilador e as escritas, 6,11 vezes. Como a contagem de acessos por bloco não registra busca e rotação, interpretamos essa diferença como coerente com a localidade sequencial da carga de compilação e os acessos diretos do banco. Nos sistemas reais, o acesso sequencial é ainda mais favorecido, porque o Linux detecta a leitura sequencial e faz readahead no cache de páginas, o que o SimES não modela.
 
 **Veredito:** CONFIRMADA
 
@@ -160,7 +164,7 @@ Registramos as hipóteses antes da execução oficial inicial e as mantivemos na
 
 **Evidências:** Consultamos `resultados/experimentos.csv` e `resultados/arquivos_por_operacao.csv` com `experimento=X4` e `operacao=open`, além de `graficos/X4_open_por_profundidade.png`.
 
-**Análise:** Observamos que as leituras cresceram linearmente, uma por nível. O tempo também cresceu linearmente neste caso porque os blocos físicos estavam próximos, outros posicionamentos podem alterar o tempo sem mudar o número de leituras.
+**Análise:** Observamos que as leituras cresceram linearmente, uma por nível. O tempo também cresceu linearmente neste caso porque os blocos físicos estavam próximos, outros posicionamentos podem alterar o tempo sem mudar o número de leituras. No Linux, o cache de nomes (dcache) mantém na memória os componentes já resolvidos, e por isso aberturas repetidas do mesmo caminho raramente leem os diretórios do disco; o SimES não tem esse cache e cobra a leitura de cada nível.
 
 **Veredito:** CONFIRMADA
 
@@ -176,7 +180,7 @@ Registramos as hipóteses antes da execução oficial inicial e as mantivemos na
 
 **Evidências:** Consultamos `resultados/experimentos.csv` e `resultados/arquivos.csv` com `experimento=X5`, além de `graficos/X5_tabelas.png`.
 
-**Análise:** Observamos que as aberturas por processo são contabilizadas separadamente, embora várias possam apontar ao mesmo FCB global. Os máximos podem ocorrer em instantes diferentes da carga.
+**Análise:** Observamos que as aberturas por processo são contabilizadas separadamente, embora várias possam apontar ao mesmo FCB global. Os máximos podem ocorrer em instantes diferentes da carga. Essa organização é a dos sistemas Unix: cada processo tem sua tabela de descritores, o kernel mantém uma tabela global de arquivos abertos com contador de referências e os arquivos em si são identificados por i-nodes; o Windows usa estrutura equivalente, com tabela de handles por processo.
 
 **Veredito:** CONFIRMADA
 
@@ -209,7 +213,7 @@ Com write-through, executamos 1.045 gravações físicas em cada capacidade e n�
 
 **Evidências:** Consultamos `resultados/experimentos.csv` e `resultados/es.csv` com `experimento=X6`, além de `graficos/X6_acerto.png` e `graficos/X6_escrita.png`.
 
-**Análise:** Observamos que a capacidade elevou os acertos até saturar em 1.024 blocos. LRU superou FIFO nas capacidades menores e empatou nas maiores. Write-back reduziu as gravações físicas, mas perdemos até 55 blocos sujos, write-through gravou imediatamente e não perdeu blocos. A perda dependeu da quantidade ainda suja no instante fixo da queda.
+**Análise:** Observamos que a capacidade elevou os acertos até saturar em 1.024 blocos. LRU superou FIFO nas capacidades menores e empatou nas maiores. Write-back reduziu as gravações físicas, mas perdemos até 55 blocos sujos, write-through gravou imediatamente e não perdeu blocos. A perda dependeu da quantidade ainda suja no instante fixo da queda. Nos sistemas reais, o Linux e o Windows usam write-back no cache de páginas, com gravação periódica em segundo plano (threads de flush no Linux, lazy writer no Windows), e por isso o risco de perder dados sujos numa queda de energia existe; as aplicações o reduzem com `fsync` ou com abertura em modo write-through.
 
 **Veredito:** CONFIRMADA
 
@@ -235,7 +239,7 @@ Com write-through, executamos 1.045 gravações físicas em cada capacidade e n�
 
 **Evidências:** Consultamos `resultados/experimentos.csv` e `resultados/es.csv` com `experimento=X7`, além de `graficos/X7_resposta_p95_ms.png` e `graficos/X7_espera_max_ms.png`.
 
-**Análise:** Observamos que FCFS degradou fortemente com a carga maior. DEADLINE igualou SSTF quando nenhum prazo vencia, no intervalo de 9 ms, reduzimos a espera máxima de 265,509 para 204,246 ms. A 8 ms, reduzimos de 327,061 para 244,840 ms, mas a espera ainda superou a de SCAN, C-SCAN, LOOK e C-LOOK. Concluímos que DEADLINE reduziu a espera frente a SSTF, sem garantir a menor espera máxima entre todos.
+**Análise:** Observamos que FCFS degradou fortemente com a carga maior. DEADLINE igualou SSTF quando nenhum prazo vencia, como nos 14 ms; no intervalo de 9 ms (valores em `resultados/es.csv`), reduzimos a espera máxima de 265,509 para 204,246 ms. A 8 ms, reduzimos de 327,061 para 244,840 ms, mas a espera ainda superou a de SCAN, C-SCAN, LOOK e C-LOOK. Concluímos que DEADLINE reduziu a espera frente a SSTF, sem garantir a menor espera máxima entre todos. O `mq-deadline` do Linux segue a mesma ideia, mas com prazos próprios para leituras e para escritas (as leituras têm prazo menor) e filas separadas por direção, o que o nosso DEADLINE simplificado não reproduz.
 
 **Veredito:** PARCIALMENTE CONFIRMADA
 
@@ -258,7 +262,7 @@ Com write-through, executamos 1.045 gravações físicas em cada capacidade e n�
 
 **Evidências:** Consultamos `resultados/experimentos.csv`, `resultados/arquivos.csv` e `resultados/arquivos_por_operacao.csv` com `experimento=X11`, além de `graficos/X11_alocacao.png` e `graficos/X11_fragmentacao.png`.
 
-**Análise:** Observamos que a alocação contígua preservou a contiguidade dos arquivos alocados, mas terminou com 50 segmentos e 113 falhas apesar de ainda haver 2.052 blocos livres, o maior segmento tinha 154 blocos. A alocação encadeada exigiu muitos acessos a ponteiros. FAT foi mais barata neste modelo porque mantivemos os ponteiros em memória, indexada teve custo intermediário de metadados. Consideramos que o modelo não atribui à FAT o custo de persistir/sincronizar a tabela.
+**Análise:** Observamos que a alocação contígua preservou a contiguidade dos arquivos alocados, mas terminou com 50 segmentos e 113 falhas apesar de ainda haver 2.052 blocos livres, o maior segmento tinha 154 blocos. A alocação encadeada exigiu muitos acessos a ponteiros. FAT foi mais barata neste modelo porque mantivemos os ponteiros em memória, indexada teve custo intermediário de metadados. Consideramos que o modelo não atribui à FAT o custo de persistir/sincronizar a tabela. Nos sistemas reais, a FAT dos pendrives (FAT32 e exFAT) mantém a tabela no disco e a coloca em cache na memória, e é por isso que ela é lenta para arquivos grandes fragmentados e frágil a remoções sem ejetar; o ext4 e o NTFS usam alocação por extents, que se aproxima da alocação contígua com a flexibilidade da indexada.
 
 **Veredito:** PARCIALMENTE CONFIRMADA
 
@@ -285,7 +289,7 @@ Com write-through, executamos 1.045 gravações físicas em cada capacidade e n�
 
 **Evidências:** Consultamos `resultados/experimentos.csv` e as 24 linhas de `resultados/es.csv` com `experimento=X12`, além de `graficos/X12_resposta.png`.
 
-**Análise:** Conferimos todas as 24 combinações. LRU reduziu a resposta média agregada nos quatro pares de carga/alocação. Os acertos variaram com a localidade: medimos 4,96% no banco contíguo e 74,53% no banco indexado. Também observamos que a relação entre resposta e deslocamento não foi uniforme: no compilador, o deslocamento total médio aumentou com LRU, no banco, diminuiu. Portanto, interpretamos resposta, deslocamento e acertos em conjunto, sem concluir que a cache sempre reduz o movimento do braço. Sem cache, a alocação indexada teve maior resposta média nesta carga, coerente com os acessos aos índices. As médias agrupadas não isolam o efeito de cada escalonador, para essa comparação, consultamos cada linha individual.
+**Análise:** Conferimos todas as 24 combinações. LRU reduziu a resposta média agregada nos quatro pares de carga/alocação. Os acertos variaram com a localidade: medimos 4,96% no banco contíguo e 74,53% no banco indexado. Também observamos que a relação entre resposta e deslocamento não foi uniforme: no compilador, o deslocamento total médio aumentou com LRU, no banco, diminuiu. Portanto, interpretamos resposta, deslocamento e acertos em conjunto, sem concluir que a cache sempre reduz o movimento do braço. Sem cache, a alocação indexada teve maior resposta média nesta carga, coerente com os acessos aos índices. As médias agrupadas não isolam o efeito de cada escalonador, para essa comparação, consultamos cada linha individual. Essa ordem de camadas é a dos sistemas reais: o cache de páginas fica acima do escalonador de E/S, de modo que só as requisições que falham no cache chegam ao escalonador, e por isso o cache pode mudar o padrão de acessos que o escalonador enxerga.
 
 **Veredito:** PARCIALMENTE CONFIRMADA
 
@@ -305,7 +309,6 @@ Ao discutirmos cache e sistemas de arquivos, consultamos a documentação da Mic
 - Simulamos sincronização de cache fixa e uma única queda, sem persistência nem recuperação.
 - Implementamos DEADLINE e os alocadores segundo regras didáticas, não como reproduções integrais de um kernel ou filesystem comercial.
 - Na integração, convertemos históricos em eventos, mas não simulamos concorrência entre filesystem e driver.
-- Embora tenhamos consultado o enunciado oficial, mantemos como limitação as simplificações do simulador descritas acima.
 
 ## 6. Conclusões
 
@@ -313,7 +316,7 @@ Ao discutirmos cache e sistemas de arquivos, consultamos a documentação da Mic
 2. Observamos que o custo relativo de polling e interrupção depende da duração do dispositivo e dos custos fixos por bloco do modelo.
 3. Medimos que write-back reduz gravações físicas mas mantém dados sujos até a sincronização ou a queda.
 4. Concluímos que os métodos de alocação deslocam custos entre metadados, acessos diretos e fragmentação.
-5. Conferimos que, em X12, precisamos verificar as combinações nas linhas de resultado, além do status geral.
+5. Em X12, as médias agrupadas escondem o efeito de cada escalonador, por isso conferimos as 24 combinações linha a linha e não apenas o status geral.
 
 ## 7. Referências
 
@@ -330,4 +333,5 @@ Consultamos as seguintes referências:
 ## 8. Declaração de autoria e uso de IA
 
 **Uso de ferramentas de IA:**
-Usamos o Copilot do GitHub Codespaces para nos auxiliar no entendimento inicial do trabalho e na revisão do relatório.
+- **GitHub Copilot (Codespaces):** auxiliou no entendimento inicial do trabalho e na revisão do `RELATORIO.md`.
+- **Claude Code (Anthropic):** auxiliou a ajustar o `RELATORIO.md`
